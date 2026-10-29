@@ -9,7 +9,7 @@ def write_log(run_id, event, tool=None, args=None, ok=True, model=None, duration
     log_dir.mkdir(parents=True, exist_ok=True)
 
     entry = {
-        "ts": datetime.now()astimezone().isoformat(),
+        "ts": datetime.now().astimezone().isoformat(),
         "run_id": run_id,
         "event": event,
         "tool": tool, 
