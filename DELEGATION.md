@@ -53,3 +53,5 @@ Die Tabelle hält die drei in der Aufgabenstellung genannten Kategorien fest: **
 | **F – Notizen aufräumen**                          | **Keine konkrete Änderungsfreigabe.** Es wurden nur die Zuständigkeitsregeln festgelegt.                                                  | **Ja, vor Änderungen.** Der Agent müsste nennen, welche Notizen erstellt oder gelöscht werden sollen, und die Zustimmung einholen; bei Unklarheit müsste er „aufräumen“ präzisieren lassen. | Eine Genehmigung zum Lesen über `notes()` oder `note(id)` wäre unnötig.                     | Tatsächliche Notizinhalte, zu löschende Notizen, gewünschte Ordnung und eine freigegebene Änderungsliste fehlten.                     |
 
 **Übergreifende Erkenntnis:** Der Agent kann lesende Informationsabfragen eigenständig ausführen; Rückfragen sollten sich auf konkrete Änderungen und verbindliche Handlungen beziehen und müssen **vor** deren Ausführung erfolgen, nicht erst vor der abschließenden Antwort.
+
+<img width="1668" height="2234" alt="mermaid-diagram" src="https://github.com/user-attachments/assets/f6e455ad-e097-4e6d-9afb-c37dfd3eebd9" />
