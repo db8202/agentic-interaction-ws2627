@@ -1,29 +1,34 @@
+
+"""Groq-Anbindung und zentrale Anweisungen für unseren Kalender-Agenten."""
+
+import json
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
+SYSTEM_PROMPT = (
+    "Du bist ein hilfreicher KI-Assistent. "
+    "Beantworte allgemeine Fragen direkt ohne Werkzeug. "
+    "Für Fragen zu Kalenderterminen verwende das Tool get_calendar_day. "
+    "Wenn mehrere Tage gefragt sind, rufe das Tool für jeden benötigten Tag auf. "
+    "Erfinde keine Termine und verwende keine ausgedachten Kalenderdaten. "
+    "Falls das Datum einer Kalenderfrage unklar ist, frage danach. "
+    "Bei status no_data liegen keine Kalenderdaten vor; das bedeutet nicht, "
+    "dass an diesem Tag sicher keine Termine existieren. "
+    "Wenn ein Tool fehlschlägt, berücksichtige die Fehlermeldung, "
+    "arbeite wenn möglich weiter und benenne fehlende Informationen. "
+    "Wenn alle nötigen Informationen vorliegen oder kein Tool erforderlich ist, "
+    "gib eine abschließende Antwort."
+)
 
-def request_calendar_tool(task):
-    """Fragt Groq: direkte Antwort oder Kalender-Tool-Aufruf?"""
 
-    # 1. Zugangsdaten und Modell aus der .env laden.
-    project_dir = Path(__file__).resolve().parent.parent
-    load_dotenv(project_dir / ".env", override=False)
-
-    base_url = os.getenv("OPENAI_BASE_URL")
-    api_key = os.getenv("OPENAI_API_KEY")
-    model = os.getenv("MODEL")
-
-    if not all([base_url, api_key, model]):
-        raise ValueError("Modellkonfiguration unvollstaendig.")
-
-    # 2. Client fuer die OpenAI-kompatible Groq-Schnittstelle erstellen.
-    client = OpenAI(api_key=api_key, base_url=base_url)
-
-    # 3. Tool nur BESCHREIBEN. Ausgefuehrt wird es spaeter in __main__.py.
-    tools = [{
+#    Werkzeugbeschreibung: Groq kennt den Namen und das Datumsargument.
+#    Die tatsächliche Python-Funktion wird erst in __main__.py ausgeführt.
+TOOLS = [
+    {
         "type": "function",
         "function": {
             "name": "get_calendar_day",
@@ -36,29 +41,32 @@ def request_calendar_tool(task):
                         "description": "Datum im Format YYYY-MM-DD"
                     }
                 },
-                "required": ["date"]  # Wenn das Tool gerufen wird, braucht es ein Datum.
+                "required": ["date"]
             }
         }
-    }]
+    }
+]
 
-    # 4. Erste Modellanfrage: Groq entscheidet, ob es das Tool benoetigt.
-    response = client.chat.completions.create(
+
+def request_model(messages):
+    """Sendet den bisherigen Nachrichtenverlauf an Groq und gibt die Antwort zurück."""
+
+    # Zugangsdaten laden. Bereits gesetzte Umgebungsvariablen haben Vorrang.
+    project_dir = Path(__file__).resolve().parent.parent
+    load_dotenv(project_dir / ".env", override=False)
+
+    base_url = os.getenv("OPENAI_BASE_URL")
+    api_key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("MODEL")
+    if not all([base_url, api_key, model]):
+        raise ValueError("Modellkonfiguration unvollständig.")
+
+
+    #Ein Modellschritt: Groq antwortet direkt ODER fordert Tools an.
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=25.0, max_retries=1)
+    return client.chat.completions.create(
         model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Du bist ein hilfreicher KI-Assistent. "
-                    "Beantworte allgemeine Fragen direkt ohne Werkzeug. "
-                    "Wenn eine Frage Kalenderinformationen benoetigt, verwende "
-                    "das Tool get_calendar_day. Erfinde keine Termine. "
-                    "Wenn fuer eine Kalenderfrage das Datum fehlt, frage danach."
-                )
-            },
-            {"role": "user", "content": task}
-        ],
-        tools=tools,
-        tool_choice="auto"  # WICHTIG: Tool nur bei Bedarf, nicht zwangsweise.
+        messages=messages,
+        tools=TOOLS,
+        tool_choice="auto"
     )
-
-    return response
