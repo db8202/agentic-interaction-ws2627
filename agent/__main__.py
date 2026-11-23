@@ -18,6 +18,7 @@ from agent.runlog import write_log
 
 MAX_MODEL_STEPS = 6
 MAX_TOOL_CALLS_PER_STEP = 5
+MAX_TOTAL_TOOL_CALLS = 12  # Maximal 12 Tool-Anforderungen pro Programmlauf.
 
 
 def elapsed_ms(start):
@@ -72,6 +73,7 @@ def main():
         # SCHUTZ 4: Gleiche Kalenderdaten pro Lauf nicht mehrfach herunterladen.
         # Nur erfolgreich zurueckgegebene Resultate werden zwischengespeichert.
         calendar_cache = {}
+        total_tool_calls = 0  # Zaehlt auch fehlerhafte Tool-Anforderungen.
 
         # Agent Loop: Ein Durchlauf entspricht einem Aufruf von request_model().
         for step in range(1, max_steps + 1):
@@ -169,6 +171,16 @@ def main():
                 ):
                     raise RuntimeError("Unvollstaendige Tool-Anforderung von Groq.")
 
+            # Gleiche Tool-IDs in einer Modellantwort waeren nicht eindeutig.
+            ids = [call.id for call in tool_calls]
+            if len(ids) != len(set(ids)):
+                raise RuntimeError("Doppelte Tool-Call-IDs von Groq erhalten.")
+
+            # Neben dem Pro-Schritt-Limit gilt auch ein Gesamtbudget.
+            if total_tool_calls + len(tool_calls) > MAX_TOTAL_TOOL_CALLS:
+                raise RuntimeError("Gesamtlimit fuer Tool-Aufrufe erreicht.")
+            total_tool_calls += len(tool_calls)
+
             # Erst die Modellnachricht mit ALLEN Tool-Anforderungen speichern.
             messages.append({
                 "role": "assistant",
@@ -235,7 +247,9 @@ def main():
                             source = "cache"
                         else:
                             result = get_calendar_day(day, data_url)
-                            calendar_cache[day] = result
+                            # Fehlerobjekte nicht im Cache behalten.
+                            if not (isinstance(result, dict) and result.get("status") == "error"):
+                                calendar_cache[day] = result
                             source = "api"
 
                     elif tool_name == "get_weather":
@@ -255,7 +269,12 @@ def main():
                         result = get_train_connections(from_city, to_city, day, data_url)
                         source = "api"
 
-                    ok = True
+                    # Eine Rueckgabe ist nicht automatisch ein Erfolg.
+                    if not isinstance(result, dict):
+                        raise ValueError("Tool lieferte kein JSON-Objekt.")
+                    ok = result.get("status") != "error"
+                    if not ok:
+                        source = "error"
 
                 except Exception as error:
                     # SCHUTZ 16: Ein Tool-Fehler beendet nicht die anderen Tools.
