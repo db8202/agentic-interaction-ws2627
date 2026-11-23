@@ -12,6 +12,13 @@ from openai import OpenAI
 SYSTEM_PROMPT = (
     "Du bist ein hilfreicher KI-Assistent. "
     "Beantworte allgemeine Fragen direkt ohne Werkzeug. "
+    "Fuer Wetterfragen verwende get_weather, fuer Zugfragen get_train_connections. "
+    "Wenn eine Frage beides braucht, verwende beide Werkzeuge. "
+    "Nutze die Kuerzel ulm und muenchen (auch fuer Munich/Muenchen). "
+    "Fehlt der Startort, lasse from_city weg: Das Tool liest context.json. "
+    "Nenne den angenommenen Startort in der Antwort. "
+    "Erfinde keine Temperaturen, Zuege oder Abfahrtszeiten. "
+    "status no_data bedeutet: keine Daten verfuegbar, nicht: es gibt keine Zuege. "
     "Für Fragen zu Kalenderterminen verwende das Tool get_calendar_day. "
     "Wenn mehrere Tage gefragt sind, rufe das Tool für jeden benötigten Tag auf. "
     "Erfinde keine Termine und verwende keine ausgedachten Kalenderdaten. "
@@ -46,6 +53,45 @@ TOOLS = [
         }
     }
 ]
+
+
+# Zwei neue Tool-Beschreibungen fuer Uebung 4.
+TOOLS.extend([
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Liest Wetterdaten fuer einen Ort und Tag (z.B. ulm, muenchen).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "Stadt, z.B. muenchen"},
+                    "date": {"type": "string", "description": "Datum YYYY-MM-DD"}
+                },
+                "required": ["city", "date"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_train_connections",
+            "description": (
+                "Liest Zugverbindungen zwischen Staedten. "
+                "Ohne Startort from_city weglassen: Kontext liefert den Wohnort."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "from_city": {"type": "string", "description": "Optionaler Startort"},
+                    "to_city": {"type": "string", "description": "Zielort, z.B. muenchen"},
+                    "date": {"type": "string", "description": "Datum YYYY-MM-DD"}
+                },
+                "required": ["to_city", "date"]
+            }
+        }
+    }
+])
 
 
 def request_model(messages):

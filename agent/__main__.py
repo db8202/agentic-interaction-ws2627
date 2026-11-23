@@ -11,6 +11,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from agent.calendar import get_calendar_day
+from agent.travel import get_weather, get_train_connections
 from agent.model import SYSTEM_PROMPT, TOOLS, request_model
 from agent.runlog import write_log
 
@@ -214,7 +215,7 @@ def main():
 
                 try:
                     # SCHUTZ 13: Nur ausdruecklich erlaubte Tools ausfuehren.
-                    if tool_name != "get_calendar_day":
+                    if tool_name not in ("get_calendar_day", "get_weather", "get_train_connections"):
                         raise ValueError(f"Unbekanntes Tool: {tool_name}")
 
                     # SCHUTZ 14: Argumente muessen ein JSON-Objekt sein.
@@ -227,14 +228,31 @@ def main():
 
                     day = arguments["date"]
 
-                    if day in calendar_cache:
-                        result = calendar_cache[day]
-                        source = "cache"
-                    else:
-                        # HIER wird das echte Python-Tool ausgefuehrt.
-                        # calendar.py prueft zusaetzlich das ISO-Datumsformat.
-                        result = get_calendar_day(day, data_url)
-                        calendar_cache[day] = result
+                    if tool_name == "get_calendar_day":
+                        # Bisheriger Kalenderabruf mit Cache.
+                        if day in calendar_cache:
+                            result = calendar_cache[day]
+                            source = "cache"
+                        else:
+                            result = get_calendar_day(day, data_url)
+                            calendar_cache[day] = result
+                            source = "api"
+
+                    elif tool_name == "get_weather":
+                        city = arguments.get("city")
+                        if not isinstance(city, str):
+                            raise ValueError("Stadt fehlt oder ist kein String.")
+                        result = get_weather(city, day, data_url)
+                        source = "api"
+
+                    elif tool_name == "get_train_connections":
+                        to_city = arguments.get("to_city")
+                        from_city = arguments.get("from_city")
+                        if not isinstance(to_city, str):
+                            raise ValueError("Zielort fehlt oder ist kein String.")
+                        if from_city is not None and not isinstance(from_city, str):
+                            raise ValueError("Startort muss ein String sein.")
+                        result = get_train_connections(from_city, to_city, day, data_url)
                         source = "api"
 
                     ok = True
