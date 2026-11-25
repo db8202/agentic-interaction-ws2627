@@ -3,3 +3,4 @@
 logs/
 _pycache_/
 *.pyc
+.vs/
